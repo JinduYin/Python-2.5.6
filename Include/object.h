@@ -63,10 +63,12 @@ whose size is determined when the object is allocated.
 
 #ifdef Py_TRACE_REFS
 /* Define pointers to support a doubly-linked list of all live heap objects. */
+// 双向链接表结构，垃圾回收使用
 #define _PyObject_HEAD_EXTRA		\
 	struct _object *_ob_next;	\
 	struct _object *_ob_prev;
 
+// 程序里用 0, 0 替换将_PyObject_EXTRA_INIT
 #define _PyObject_EXTRA_INIT 0, 0,
 
 #else
@@ -75,6 +77,10 @@ whose size is determined when the object is allocated.
 #endif
 
 /* PyObject_HEAD defines the initial segment of every PyObject. */
+// 每个Python对象的初始段定义
+// _PyObject_HEAD_EXTRA 双向指针 调试是编译
+// ob_refcnt 引用计数  Py_ssize_t 可以以int视之
+// ob_type 指向类型对象的指针(指向_typeobject结构体(PyTypeObject))决定对象的类型
 #define PyObject_HEAD			\
 	_PyObject_HEAD_EXTRA		\
 	Py_ssize_t ob_refcnt;		\
@@ -100,10 +106,12 @@ whose size is determined when the object is allocated.
  * by hand.  Similarly every pointer to a variable-size Python object can,
  * in addition, be cast to PyVarObject*.
  */
+// 所有对象的基类
 typedef struct _object {
 	PyObject_HEAD
 } PyObject;
 
+// 变长对象的基类
 typedef struct {
 	PyObject_VAR_HEAD
 } PyVarObject;
@@ -260,7 +268,12 @@ typedef PyObject *(*allocfunc)(struct _typeobject *, Py_ssize_t);
 
 typedef struct _typeobject {
 	PyObject_VAR_HEAD
+	// 类型名
 	const char *tp_name; /* For printing, in format "<module>.<name>" */
+	//分配内存大小
+	//tp_basicsize 对象大小
+	//tp_itemsize  变长对象基本元素大小 例如string基本元素大小是 sizeof(char)
+	//             定长对象tp_itemsize=0
 	Py_ssize_t tp_basicsize, tp_itemsize; /* For allocation */
 
 	/* Methods to implement standard operations */

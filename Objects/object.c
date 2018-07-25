@@ -213,7 +213,9 @@ PyObject_Init(PyObject *op, PyTypeObject *tp)
 	if (op == NULL)
 		return PyErr_NoMemory();
 	/* Any changes should be reflected in PyObject_INIT (objimpl.h) */
+	// 类型对象赋值
 	op->ob_type = tp;
+	// 引用初始化
 	_Py_NewReference(op);
 	return op;
 }
@@ -1899,7 +1901,10 @@ _Py_ReadyTypes(void)
 void
 _Py_NewReference(PyObject *op)
 {
+    // DEBUG 模式自增引用计数
 	_Py_INC_REFTOTAL;
+
+	// 初始化类型对象的引用计数为1
 	op->ob_refcnt = 1;
 	_Py_AddToAllObjects(op, 1);
 	_Py_INC_TPALLOCS(op);

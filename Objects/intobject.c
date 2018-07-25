@@ -26,11 +26,15 @@ PyInt_GetMax(void)
    free_list is a singly-linked list of available PyIntObjects, linked
    via abuse of their ob_type members.
 */
-
+//块大小
 #define BLOCK_SIZE	1000	/* 1K less typical malloc overhead */
+//存放可容纳64位指针大小的空间
 #define BHEAD_SIZE	8	/* Enough for a 64-bit pointer */
+//多少个PyIntObject对象  (1000 - 8) / 24  CentOS 7 64位系统 等于41个
+// 32位系统 (1000 - 8) / 12 等于82
 #define N_INTOBJECTS	((BLOCK_SIZE - BHEAD_SIZE) / sizeof(PyIntObject))
 
+//块结构体，是一个单链表的指针和N_INTOBJECTS个PyIntObject对象的objects
 struct _intblock {
 	struct _intblock *next;
 	PyIntObject objects[N_INTOBJECTS];
@@ -38,7 +42,10 @@ struct _intblock {
 
 typedef struct _intblock PyIntBlock;
 
+// PyIntBlock的单向列表通过block_list维护，
+// 每一个block中都维护了一个PyIntObject数组——objects，
 static PyIntBlock *block_list = NULL;
+// 单向链表来管理全部block的objects中所有的空闲内存，表头指针就是free_list
 static PyIntObject *free_list = NULL;
 
 static PyIntObject *
@@ -46,18 +53,44 @@ fill_free_list(void)
 {
 	PyIntObject *p, *q;
 	/* Python's object allocator isn't appropriate for large blocks. */
+	//申请大小为sizeof(PyIntBlock)的内存空间，并链接到已有的block list中
+	//大小等于 41 * 24 + 8 = 992
 	p = (PyIntObject *) PyMem_MALLOC(sizeof(PyIntBlock));
 	if (p == NULL)
 		return (PyIntObject *) PyErr_NoMemory();
+	// 当前block的next指向原来的block_list
 	((PyIntBlock *)p)->next = block_list;
+	// block_list执向新的block
 	block_list = (PyIntBlock *)p;
 	/* Link the int objects together, from rear to front, then return
 	   the address of the last int object in the block. */
+	//将PyIntBlock中的PyIntObject数组——objects——转变成单向链表
+	// p是objects数组中的第一个元素地址
 	p = &((PyIntBlock *)p)->objects[0];
+	// q 是objects数组中最后一个元素地址的下一个元素地址
+	// p 是指向数组第一个元素的地址，N_INTOBJECTS 是一个常数 41，
+	// p 指向的数组下标0，q的下标41 因为q指向下标41的开始地址，所以地址(q-p)/24 = 41
+	// q 指针实际指向的是 N_INTOBJECTS + 1 个元素的开始地址
+	// 数组指针移动一位，地址移动数组元素的所占内存大小 所以 q = p + 41 * 3 * 8 = p + 984
+	// q的实际内存地址偏移984位
 	q = p + N_INTOBJECTS;
-	while (--q > p)
+
+//	printf("-----------start------------\n");
+//	printf("p address @%x\n", p);
+//	printf("N_INTOBJECTS @%d\n", N_INTOBJECTS);
+//	printf("q address @%x\n", p + N_INTOBJECTS);
+//	printf("q -1 address @%x\n", (struct _typeobject *)(q-1));
+//	printf("p + N_INTOBJECTS - 1 address @%x\n", p + N_INTOBJECTS - 1);
+//	printf("-----------end------------\n");
+
+	// 从后往前挨个链接，即最后一个指向倒数第二个以此类推
+	while (--q > p){
 		q->ob_type = (struct _typeobject *)(q-1);
+	}
+	// 第一个objects的ob_type指向null
 	q->ob_type = NULL;
+	// 返回的是最后一个objects所指向的object.
+	// p + N_INTOBJECTS - 1 所以是最后一个元素的地址
 	return p + N_INTOBJECTS - 1;
 }
 
@@ -73,6 +106,8 @@ fill_free_list(void)
    The integers that are saved are those in the range
    -NSMALLNEGINTS (inclusive) to NSMALLPOSINTS (not inclusive).
 */
+//小整数对象池就是一个PyIntObject指针数组(注意是指针数组), 大小=257+5=262,
+//范围是[-5, 257) 注意左闭右开. 即这个数组包含了262个指向PyIntObject的指针.
 static PyIntObject *small_ints[NSMALLNEGINTS + NSMALLPOSINTS];
 #endif
 #ifdef COUNT_ALLOCS
@@ -82,10 +117,14 @@ int quick_int_allocs, quick_neg_int_allocs;
 PyObject *
 PyInt_FromLong(long ival)
 {
+    //register 关键字暗示编译程序相应的变量将会被频繁的使用，
+    //如果可能的话，应将其保存在 CPU 的寄存器中，以加快其存取速度
 	register PyIntObject *v;
 #if NSMALLNEGINTS + NSMALLPOSINTS > 0
+    // 如果在小整数范围内，引用计数加1，直接返回
 	if (-NSMALLNEGINTS <= ival && ival < NSMALLPOSINTS) {
 		v = small_ints[ival + NSMALLNEGINTS];
+		//引用+1
 		Py_INCREF(v);
 #ifdef COUNT_ALLOCS
 		if (ival >= 0)
@@ -96,14 +135,20 @@ PyInt_FromLong(long ival)
 		return (PyObject *) v;
 	}
 #endif
+    // 如果空闲列表为空
 	if (free_list == NULL) {
+		// 创建通用列表并返回空闲列表指针
 		if ((free_list = fill_free_list()) == NULL)
 			return NULL;
 	}
 	/* Inline PyObject_New */
+	// free_list指针赋值给v
 	v = free_list;
+	// free_list 指向下一个object
 	free_list = (PyIntObject *)v->ob_type;
+	// 初始化类型对象，引用计数等
 	PyObject_INIT(v, &PyInt_Type);
+	// 赋值
 	v->ob_ival = ival;
 	return (PyObject *) v;
 }
@@ -127,12 +172,17 @@ PyInt_FromSsize_t(Py_ssize_t ival)
 static void
 int_dealloc(PyIntObject *v)
 {
+    // 是整数类型, 将对象放入free_list单向链表头
 	if (PyInt_CheckExact(v)) {
+		// 把free_list的指针赋值给当前object的ob_type
 		v->ob_type = (struct _typeobject *)free_list;
+		// free_list指针指向当前object。
+		// 即当前释放的空间会最早被利用
 		free_list = v;
-	}
-	else
+	} else {
+        //派生类的对象调用方法
 		v->ob_type->tp_free((PyObject *)v);
+	}
 }
 
 static void
@@ -426,8 +476,50 @@ static int
 int_print(PyIntObject *v, FILE *fp, int flags)
      /* flags -- not used but required by interface */
 {
-	fprintf(fp, "%ld", v->ob_ival);
+	fprintf(fp, "%ld\n", v->ob_ival);
+	printf(" free_list : %p", free_list);
 	return 0;
+
+//	//JIN_DU
+//    int values[10];
+//    int refcounts[10];
+//    PyIntObject* intObjectPtr;
+//    PyIntBlock *p = block_list;
+//    PyIntBlock *last = NULL;
+//    int count = 0;
+//    int i;
+//
+//    while(p != NULL)  {
+//        ++count;
+//        last = p;
+//        p = p->next;
+//    }
+//
+//    intObjectPtr = last->objects;
+//    intObjectPtr += N_INTOBJECTS - 1;
+//    printf(" value   @%ld\n", v->ob_ival);
+//    printf(" address @%p\n", v);
+//
+//    for(i = 0; i < 10; ++i, --intObjectPtr)  {
+//        values[i] = intObjectPtr->ob_ival;
+//        refcounts[i] = intObjectPtr->ob_refcnt;
+//    }
+//
+//    printf(" value : ");
+//    for(i = 0; i < 8; ++i)  {
+//        printf("%d\t", values[i]);
+//    }
+//    printf("\n");
+//
+//    printf(" refcnt : ");
+//    for(i = 0; i < 8; ++i)  {
+//        printf("%d\t", refcounts[i]);
+//    }
+//
+//    printf("\n");
+//    printf(" block_list count : %d\n", count);
+//    printf(" free_list : %p\n", free_list);
+//    return 0;
 }
 
 static PyObject *
@@ -1117,9 +1209,9 @@ static PyNumberMethods int_as_number = {
 
 PyTypeObject PyInt_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,
-	"int",
-	sizeof(PyIntObject),
+	0,                          /* ob_size 变长对象所容纳元素个数 */
+	"int",                      /* 类型名 */
+	sizeof(PyIntObject),        /* 分配内存大小 */
 	0,
 	(destructor)int_dealloc,		/* tp_dealloc */
 	(printfunc)int_print,			/* tp_print */
@@ -1166,13 +1258,24 @@ _PyInt_Init(void)
 	int ival;
 #if NSMALLNEGINTS + NSMALLPOSINTS > 0
 	for (ival = -NSMALLNEGINTS; ival < NSMALLPOSINTS; ival++) {
-              if (!free_list && (free_list = fill_free_list()) == NULL)
+        //如果free_list还不存在, 或者满了.
+        //新建一块PyIntBlock, 并将空闲空间链表头部地址给free_list
+        if (!free_list && (free_list = fill_free_list()) == NULL)
 			return 0;
 		/* PyObject_New is inlined */
+		// 使用单向链表头位置
 		v = free_list;
+
+		// free_list指向单向链表下一个位置
 		free_list = (PyIntObject *)v->ob_type;
+
+		// 初始化对象v 类型是PyInt_Type,
 		PyObject_INIT(v, &PyInt_Type);
+
+		// 赋值 ival
 		v->ob_ival = ival;
+
+		// PyIntObject指针数组  索引（ival + NSMALLNEGINTS） 第一个 -5 + 5
 		small_ints[ival + NSMALLNEGINTS] = v;
 	}
 #endif

@@ -2883,7 +2883,8 @@ static PyMethodDef object_methods[] = {
 	{0}
 };
 
-
+/*
+*/
 PyTypeObject PyBaseObject_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
  	0,					/* ob_size */
