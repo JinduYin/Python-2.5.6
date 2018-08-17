@@ -33,9 +33,18 @@ functions should be applied to nil objects.
    Together, these sped the interpreter by up to 20%. */
 
 typedef struct {
+    //PyStringObject是变长对象, 比定长对象多了一个ob_size字段
     PyObject_VAR_HEAD
+    //存储字符串的hash值, 如果还没计算等于-1
+    //当string_hash被调用, 计算结果会被保存到这个字段一份, 后续不再进行计算
     long ob_shash;
+    //标记了该对象是否已经过intern机制的处理
     int ob_sstate;
+    //是一个字符的字符数组，实际是作为一个字符指针指向一段内存
+    //例如字符串'python',ob_sval实际存的是字符串的开头字符p, 因为数组的第一个元素的地址就是指针地址
+    //以'\0'结尾的字符数组可以视为字符串
+    //指向一个ob_size+1大小数组(c中字符串最后要多一个字符`\0`表字符串结束)
+    //这里选用字符数组，可能是出去后期字符串切片/取值有关（作为数组操作），暂且不继续讨论
     char ob_sval[1];
 
     /* Invariants:

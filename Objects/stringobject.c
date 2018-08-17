@@ -10,6 +10,8 @@
 int null_strings, one_strings;
 #endif
 
+// [Lib/plat-linux2/IN.py]
+// UCHAR_MAX 255
 static PyStringObject *characters[UCHAR_MAX + 1];
 static PyStringObject *nullstring;
 
@@ -21,6 +23,8 @@ static PyStringObject *nullstring;
    Another way to look at this is that to say that the actual reference
    count of a string is:  s->ob_refcnt + (s->ob_sstate?2:0)
 */
+//包含所有interned字符串的字典，引用该字典内的字符串，不在字符串的ob_refcnt中计算。
+//指针, 指向PyDictObject
 static PyObject *interned;
 
 /*
@@ -113,20 +117,38 @@ PyString_FromString(const char *str)
 	register size_t size;
 	register PyStringObject *op;
 
+    // assert其值为假（即为0）终止程序
+    // str 为NULL时终止
 	assert(str != NULL);
+	// 返回字符长度，不包括结束符'\0'
 	size = strlen(str);
+	// PY_SSIZE_T_MAX 平台相关参数 win32 该值是2G。
+	// 可用内存空间小于申请内存空间大小，字符串对象创建失败，返回NULL
 	if (size > PY_SSIZE_T_MAX - sizeof(PyStringObject)) {
 		PyErr_SetString(PyExc_OverflowError,
 			"string is too long for a Python string");
 		return NULL;
 	}
+
+	//nullstring 是PyStringObject的指针，
+	//如果第一次在一个空字符串基础上创建PyStringObject，由于nullstring指针被初始化为NULL，
+	//所以Python会为这个空字符建立一个PyStringObject对象，
+	//将这个PyStringObject对象通过intern机制进行共享，
+	//然后将nullstring指向这个被共享的对象。
+	//如果在以后Python检查到需要为一个空字符串创建PyStringObject对象，
+	//这时nullstring已经存在了，那么就直接返回nullstring的引用
 	if (size == 0 && (op = nullstring) != NULL) {
 #ifdef COUNT_ALLOCS
 		null_strings++;
 #endif
+        //引用计数加1，返回指针
 		Py_INCREF(op);
 		return (PyObject *)op;
 	}
+
+	//当size等于1时，
+	//查找PyStringObject型的characters指针数组，结果不为NULL，
+	//引用计数加1 返回指针
 	if (size == 1 && (op = characters[*str & UCHAR_MAX]) != NULL) {
 #ifdef COUNT_ALLOCS
 		one_strings++;
@@ -136,24 +158,44 @@ PyString_FromString(const char *str)
 	}
 
 	/* Inline PyObject_NewVar */
+	//申请内存
+	//sizeof(PyStringObject)(PyStringObject的内存)
+	//size(字符数组内的元素申请的额外内存)
 	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
+
+    //宏定义定义位置[Include/objimpl.h]
+    //方法定义位置[Object/object.c]
+    //初始化对象值
 	PyObject_INIT_VAR(op, &PyString_Type, size);
+	//未计算hash值， -1
 	op->ob_shash = -1;
+	//未intern, 0
 	op->ob_sstate = SSTATE_NOT_INTERNED;
+	//将字符数组拷贝到PyStringObject所维护的空间中
+	//包括结尾的'\0'
 	Py_MEMCPY(op->ob_sval, str, size+1);
 	/* share short strings */
+	// 空字符串处理
 	if (size == 0) {
 		PyObject *t = (PyObject *)op;
+		//intern机制
 		PyString_InternInPlace(&t);
 		op = (PyStringObject *)t;
+		// 空字符指想全局的nullstring指针
+		// 再次定义空字符，返回全局的空指针
 		nullstring = op;
 		Py_INCREF(op);
+	//单字符串处理
 	} else if (size == 1) {
 		PyObject *t = (PyObject *)op;
+		//intern机制
 		PyString_InternInPlace(&t);
 		op = (PyStringObject *)t;
+        // 单个字符和255进行与运算
+		// 当前字符的十进制值做下标存放单个字符指针
+		// 再次定义单个字符，直接根据下标获取
 		characters[*str & UCHAR_MAX] = op;
 		Py_INCREF(op);
 	}
@@ -524,24 +566,32 @@ PyObject *PyString_AsEncodedString(PyObject *str,
 static void
 string_dealloc(PyObject *op)
 {
+    //是否intern
 	switch (PyString_CHECK_INTERNED(op)) {
+		//不是 跳出switch继续执行
 		case SSTATE_NOT_INTERNED:
 			break;
 
+        //普通, 从interned字典中删除, 跳出，继续执行
 		case SSTATE_INTERNED_MORTAL:
 			/* revive dead object temporarily for DelItem */
+			//ob_refcnt赋值等于3，是因为PyDict_DelItem内部执行了两次Py_DECREF
+			//还有一次在tp_free执行？
 			op->ob_refcnt = 3;
 			if (PyDict_DelItem(interned, op) != 0)
 				Py_FatalError(
 					"deletion of interned string failed");
 			break;
 
+        // 用不回收对象，报错
 		case SSTATE_INTERNED_IMMORTAL:
 			Py_FatalError("Immortal interned string died.");
 
 		default:
 			Py_FatalError("Inconsistent interned string state.");
 	}
+
+	// 内存回收
 	op->ob_type->tp_free(op);
 }
 
@@ -857,6 +907,8 @@ string_print(PyStringObject *op, FILE *fp, int flags)
 		else
 			fputc(c, fp);
 	}
+	printf("str address @%p\n", op->ob_sval);
+	printf("str address @%p\n", &op->ob_refcnt);
 	fputc(quote, fp);
 	return 0;
 }
@@ -947,6 +999,10 @@ string_str(PyObject *s)
 static Py_ssize_t
 string_length(PyStringObject *a)
 {
+//    printf("address: @%p\n", a);
+//    printf("refcnt: %d\n", a->ob_refcnt);
+//    printf("\n");
+
 	return a->ob_size;
 }
 
@@ -980,6 +1036,7 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 	   overflow in cases where we are passed incorrectly-created
 	   strings with negative lengths (due to a bug in other code).
 	*/
+
 	size = a->ob_size + b->ob_size;
 	if (a->ob_size < 0 || b->ob_size < 0 ||
 	    a->ob_size > PY_SSIZE_T_MAX - b->ob_size) {
@@ -4044,8 +4101,8 @@ PyTypeObject PyString_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
 	"str",
-	sizeof(PyStringObject),
-	sizeof(char),
+	sizeof(PyStringObject),     /* 对象大小 */
+	sizeof(char),               /* 变长对象单个元素大小 */
  	string_dealloc, 			/* tp_dealloc */
 	(printfunc)string_print, 		/* tp_print */
 	0,					/* tp_getattr */
@@ -4945,14 +5002,20 @@ PyString_InternInPlace(PyObject **p)
 {
 	register PyStringObject *s = (PyStringObject *)(*p);
 	PyObject *t;
+	//对PystringObject进行类型和状态检查
 	if (s == NULL || !PyString_Check(s))
 		Py_FatalError("PyString_InternInPlace: strings only please!");
 	/* If it's a string subclass, we don't really know what putting
 	   it in the interned dict might do. */
+	// 不是字符串类型, 返回
 	if (!PyString_CheckExact(s))
 		return;
+	// 本身已经intern了(标志位ob_sstate), 不重复进行, 返回
 	if (PyString_CHECK_INTERNED(s))
 		return;
+
+	//如果interned等于NULL创建存放设置intern字符指针的字典
+	//PyDict_New创建的是PyStringObject的dict
 	if (interned == NULL) {
 		interned = PyDict_New();
 		if (interned == NULL) {
@@ -4960,14 +5023,23 @@ PyString_InternInPlace(PyObject **p)
 			return;
 		}
 	}
+	//检查PyStringObject对象s是否存在对应的intern后的PyStringObject对象
+	//检查interned字典是否已经存在，存在，返回
 	t = PyDict_GetItem(interned, (PyObject *)s);
 	if (t) {
+		//interned字典内的PyObject引用+1
 		Py_INCREF(t);
+		//原字符串引用-1
 		Py_DECREF(*p);
+		//指针赋值
 		*p = t;
 		return;
 	}
 
+    //在interned字典不存在，插入PyStringObject对象s
+    //PyDict_SetItem方法会分别对key和value执行Py_INCREF()方法，
+    //所以执行PyDict_SetItem后s的引用计数会增加2(refcnt + 2)
+    //保证当外部没有引用时, refcnt=0, 可以进行回收处理, (不-2, refcnt永远>=2)
 	if (PyDict_SetItem(interned, (PyObject *)s, (PyObject *)s) < 0) {
 		PyErr_Clear();
 		return;
@@ -4975,6 +5047,7 @@ PyString_InternInPlace(PyObject **p)
 	/* The two references in interned are not counted by refcnt.
 	   The string deallocator will take care of this */
 	s->ob_refcnt -= 2;
+	//修改字符串对象的ob_sstate标志位, SSTATE_INTERNED_MORTAL
 	PyString_CHECK_INTERNED(s) = SSTATE_INTERNED_MORTAL;
 }
 
