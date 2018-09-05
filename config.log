@@ -232,7 +232,7 @@ configure: failed program was:
 configure:4703: result: no
 configure:4715: checking whether pthreads are available without options
 configure:4749: gcc -o conftest -g -O2   conftest.c  >&5
-/tmp/cceD8ZXx.o: In function `main':
+/tmp/ccXhWDB2.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:18: undefined reference to `pthread_create'
 /home/yjd48676/Python-2.5.6/conftest.c:20: undefined reference to `pthread_detach'
 collect2: error: ld returned 1 exit status
@@ -3016,7 +3016,7 @@ configure: failed program was:
 configure:11845: result: no
 configure:11859: checking for library containing sem_init
 configure:11900: gcc -o conftest -g -O2   conftest.c -ldl  >&5
-/tmp/ccR8XdX9.o: In function `main':
+/tmp/ccylsCfz.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:94: undefined reference to `sem_init'
 collect2: error: ld returned 1 exit status
 configure:11906: $? = 1
@@ -3227,7 +3227,7 @@ configure: failed program was:
 configure:12006: result: no
 configure:12076: checking for t_open in -lnsl
 configure:12111: gcc -o conftest -g -O2   conftest.c -lnsl  -lpthread -ldl  >&5
-/tmp/ccMmPAx9.o: In function `main':
+/tmp/ccYlKEzy.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:94: undefined reference to `t_open'
 collect2: error: ld returned 1 exit status
 configure:12117: $? = 1
@@ -3600,7 +3600,7 @@ configure:14785: $? = 0
 configure:14803: result: yes
 configure:14723: checking for getwd
 configure:14779: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  >&5
-/tmp/ccxay5vX.o: In function `main':
+/tmp/ccZ5XxCo.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:148: warning: the `getwd' function is dangerous and should not be used.
 configure:14785: $? = 0
 configure:14803: result: yes
@@ -3650,7 +3650,7 @@ configure:14785: $? = 0
 configure:14803: result: yes
 configure:14723: checking for plock
 configure:14779: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  >&5
-/tmp/ccfez3uB.o: In function `main':
+/tmp/ccQbID0Y.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:160: undefined reference to `plock'
 collect2: error: ld returned 1 exit status
 configure:14785: $? = 1
@@ -3825,7 +3825,7 @@ configure:14785: $? = 0
 configure:14803: result: yes
 configure:14723: checking for pthread_init
 configure:14779: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  >&5
-/tmp/cc6OfN2I.o: In function `main':
+/tmp/ccvAEJl6.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:161: undefined reference to `pthread_init'
 collect2: error: ld returned 1 exit status
 configure:14785: $? = 1
@@ -4095,7 +4095,7 @@ configure:14785: $? = 0
 configure:14803: result: yes
 configure:14723: checking for tempnam
 configure:14779: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  >&5
-/tmp/ccGYkNr5.o: In function `main':
+/tmp/cctzUxqw.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:184: warning: the use of `tempnam' is dangerous, better use `mkstemp'
 configure:14785: $? = 0
 configure:14803: result: yes
@@ -4113,13 +4113,13 @@ configure:14785: $? = 0
 configure:14803: result: yes
 configure:14723: checking for tmpnam
 configure:14779: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  >&5
-/tmp/ccdUPzdk.o: In function `main':
+/tmp/ccarHv0L.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:188: warning: the use of `tmpnam' is dangerous, better use `mkstemp'
 configure:14785: $? = 0
 configure:14803: result: yes
 configure:14723: checking for tmpnam_r
 configure:14779: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  >&5
-/tmp/cc5cHdOo.o: In function `main':
+/tmp/ccO41OhN.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:189: warning: the use of `tmpnam_r' is dangerous, better use `mkstemp'
 configure:14785: $? = 0
 configure:14803: result: yes
@@ -4157,7 +4157,7 @@ configure:14785: $? = 0
 configure:14803: result: yes
 configure:14723: checking for _getpty
 configure:14779: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  >&5
-/tmp/cc6D5vxR.o: In function `main':
+/tmp/cc9HI0Od.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:198: undefined reference to `_getpty'
 collect2: error: ld returned 1 exit status
 configure:14785: $? = 1
@@ -4615,7 +4615,7 @@ configure:15774: $? = 0
 configure:15784: result: yes
 configure:15803: checking for openpty
 configure:15859: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  >&5
-/tmp/ccrrtCaA.o: In function `main':
+/tmp/cc2SPKbY.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:211: undefined reference to `openpty'
 collect2: error: ld returned 1 exit status
 configure:15865: $? = 1
@@ -4845,7 +4845,7 @@ configure:16099: $? = 0
 configure:16117: result: yes
 configure:16278: checking for fseek64
 configure:16334: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  -lutil >&5
-/tmp/cc2bhAdC.o: In function `main':
+/tmp/ccAWlP0W.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:213: undefined reference to `fseek64'
 collect2: error: ld returned 1 exit status
 configure:16340: $? = 1
@@ -5077,7 +5077,7 @@ configure:16340: $? = 0
 configure:16358: result: yes
 configure:16278: checking for ftell64
 configure:16334: gcc -pthread -o conftest -g -O2   conftest.c -lpthread -ldl  -lutil >&5
-/tmp/ccmJbeJL.o: In function `main':
+/tmp/ccVX1jT8.o: In function `main':
 /home/yjd48676/Python-2.5.6/conftest.c:215: undefined reference to `ftell64'
 collect2: error: ld returned 1 exit status
 configure:16340: $? = 1
