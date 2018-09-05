@@ -19,9 +19,23 @@ returned item's reference count.
 extern "C" {
 #endif
 
+
+/*
+    创建list时，不是存多少东西申请多大内存，而是一次申请一大块内存。（内存管理策略，提高效率）
+    申请的内存能存下多少个PyObject存放在allocated中
+
+    allocated申请内存块总共能存放的对象数量
+    PyObject_VAR_HEAD中的ob_size是实际存放对象元素的个数（实际使用的数量）
+
+*/
+
 typedef struct {
+    //变长对象
     PyObject_VAR_HEAD
     /* Vector of pointers to list elements.  list[0] is ob_item[0], etc. */
+    //ob_item为指向元素列表的指针，实际上，Python中的list[0]就是ob_item[0]
+    //PyObject**是指向指针的指针，确保list可以同时管理不同类型的元素对象，而不像C++的向量，
+    //只能管理同一类型的元素对象。实际上，它是一个指向PyObject数组类型的指针，这样才能做到list元素的随机访问。
     PyObject **ob_item;
 
     /* ob_item contains space for 'allocated' elements.  The number
@@ -35,6 +49,7 @@ typedef struct {
      * Items must normally not be NULL, except during construction when
      * the list is not yet visible outside the function that builds it.
      */
+    //维护了当前列表中的可容纳的元素的总数
     Py_ssize_t allocated;
 } PyListObject;
 

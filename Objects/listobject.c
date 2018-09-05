@@ -32,6 +32,8 @@ list_resize(PyListObject *self, Py_ssize_t newsize)
 	   to accommodate the newsize.  If the newsize falls lower than half
 	   the allocated size, then proceed with the realloc() to shrink the list.
 	*/
+	// 不需要重新申请内存
+	// 当newsize 位于当前大小的一半以上，不需要申请内存
 	if (allocated >= newsize && newsize >= (allocated >> 1)) {
 		assert(self->ob_item != NULL || newsize == 0);
 		self->ob_size = newsize;
@@ -45,8 +47,13 @@ list_resize(PyListObject *self, Py_ssize_t newsize)
 	 * system realloc().
 	 * The growth pattern is:  0, 4, 8, 16, 25, 35, 46, 58, 72, 88, ...
 	 */
+	// 新申请内存大小计算公式
+	// newsize右移三位（newsize/2^3）+ 常量
+	// newsize < 9 常量值等于3 否则等于9
+	// 所以增长量    newsize < 9  2^n + 3
+	//              newsize >= 9 2^n + 6
 	new_allocated = (newsize >> 3) + (newsize < 9 ? 3 : 6);
-
+    //printf(" NEW_SIZE: %d NEW_ALLOCATED: %d\n", newsize, new_allocated);
 	/* check for integer overflow */
 	if (new_allocated > PY_SIZE_MAX - newsize) {
 		PyErr_NoMemory();
@@ -58,6 +65,9 @@ list_resize(PyListObject *self, Py_ssize_t newsize)
 	if (newsize == 0)
 		new_allocated = 0;
 	items = self->ob_item;
+	// 扩展内存
+	// ~(size_t)0 可能的最大内存（同SIZE_MAX）
+	// new_allocated小于等于系统最多可申请PyObject个数初始化内存
 	if (new_allocated <= ((~(size_t)0) / sizeof(PyObject *)))
 		PyMem_RESIZE(items, PyObject *, new_allocated);
 	else
@@ -66,6 +76,7 @@ list_resize(PyListObject *self, Py_ssize_t newsize)
 		PyErr_NoMemory();
 		return -1;
 	}
+	//重新设置元素指向，元素个数和总共可容纳元素个数
 	self->ob_item = items;
 	self->ob_size = newsize;
 	self->allocated = new_allocated;
@@ -96,34 +107,49 @@ PyList_New(Py_ssize_t size)
 	PyListObject *op;
 	size_t nbytes;
 
+    // size小于0 return
 	if (size < 0) {
 		PyErr_BadInternalCall();
 		return NULL;
 	}
+
+	// 计算需要的字节数（PyObject指针数组）
 	nbytes = size * sizeof(PyObject *);
 	/* Check for overflow without an actual overflow,
 	 *  which can cause compiler to optimise out */
+	// 内存数量计算，溢出检查
 	if (size > PY_SIZE_MAX / sizeof(PyObject *))
 		return PyErr_NoMemory();
+
+	// 如果缓冲池非空, 从缓冲池取。缓冲池默认缓冲80（MAXFREELISTS宏）
 	if (num_free_lists) {
 		num_free_lists--;
 		op = free_lists[num_free_lists];
 		_Py_NewReference((PyObject *)op);
 	} else {
+		// 创建PythonListObject对象
 		op = PyObject_GC_New(PyListObject, &PyList_Type);
 		if (op == NULL)
 			return NULL;
 	}
+
+	// size等于0，元素列表指针指向NULL
 	if (size <= 0)
 		op->ob_item = NULL;
 	else {
+		// 申请列表元素需要内存空间，ob_item指向开始地址
 		op->ob_item = (PyObject **) PyMem_MALLOC(nbytes);
+		// 申请失败
 		if (op->ob_item == NULL) {
 			Py_DECREF(op);
 			return PyErr_NoMemory();
 		}
+
+		// 初始化内存空间全为0
 		memset(op->ob_item, 0, nbytes);
 	}
+
+    // 这里是需要多少内存，申请多少内存，所以ob_size等于allocated等于size
 	op->ob_size = size;
 	op->allocated = size;
 	_PyObject_GC_TRACK(op);
@@ -166,20 +192,27 @@ PyList_SetItem(register PyObject *op, register Py_ssize_t i,
 {
 	register PyObject *olditem;
 	register PyObject **p;
+	// 类型检查
 	if (!PyList_Check(op)) {
 		Py_XDECREF(newitem);
 		PyErr_BadInternalCall();
 		return -1;
 	}
+	// 索引检测
 	if (i < 0 || i >= ((PyListObject *)op) -> ob_size) {
 		Py_XDECREF(newitem);
 		PyErr_SetString(PyExc_IndexError,
 				"list assignment index out of range");
 		return -1;
 	}
+	// 设置元素
+	// 取出需要设置值的元素指针
 	p = ((PyListObject *)op) -> ob_item + i;
+	// 复制给零时指针，旧值会被替换引用计数需要-1，所有要先保留旧值的指针
 	olditem = *p;
+	// 赋值新值
 	*p = newitem;
+	// 旧值引用计数-1处理，因为olditem可能是NULL所有，需要调用Py_XDECREF
 	Py_XDECREF(olditem);
 	return 0;
 }
@@ -199,20 +232,30 @@ ins1(PyListObject *self, Py_ssize_t where, PyObject *v)
 		return -1;
 	}
 
+    // 调整列表容量
 	if (list_resize(self, n+1) == -1)
 		return -1;
 
+    // 确认插入点
+    // python没有不合法的插入点，负值从list后面插入，超出从0插入。
+    // 正值大于元素个数从最后插入。
+    // where倒序取值
 	if (where < 0) {
 		where += n;
 		if (where < 0)
 			where = 0;
 	}
+
 	if (where > n)
 		where = n;
+
+	// 获取元素指针的首地址
 	items = self->ob_item;
+	// 元素插入位置后续的元素向后移一位
 	for (i = n; --i >= where; )
 		items[i+1] = items[i];
 	Py_INCREF(v);
+	// 插入元素
 	items[where] = v;
 	return 0;
 }
@@ -220,6 +263,7 @@ ins1(PyListObject *self, Py_ssize_t where, PyObject *v)
 int
 PyList_Insert(PyObject *op, Py_ssize_t where, PyObject *newitem)
 {
+    // 类型检测
 	if (!PyList_Check(op)) {
 		PyErr_BadInternalCall();
 		return -1;
@@ -230,6 +274,8 @@ PyList_Insert(PyObject *op, Py_ssize_t where, PyObject *newitem)
 static int
 app1(PyListObject *self, PyObject *v)
 {
+    // 获取元素数量用作新元素的插入的下标
+    // 宏定义在[Include/listobject.h]
 	Py_ssize_t n = PyList_GET_SIZE(self);
 
 	assert (v != NULL);
@@ -242,7 +288,10 @@ app1(PyListObject *self, PyObject *v)
 	if (list_resize(self, n+1) == -1)
 		return -1;
 
+    // 引用 +1
 	Py_INCREF(v);
+	// 设置元素
+	// 宏定义在[Include/listobject.h]
 	PyList_SET_ITEM(self, n, v);
 	return 0;
 }
@@ -305,6 +354,7 @@ list_print(PyListObject *op, FILE *fp, int flags)
 		}
 	}
 	fprintf(fp, "]");
+	printf("\nallocated=%d, ob_size=%d\n", op->allocated, op->ob_size);
 	Py_ReprLeave((PyObject *)op);
 	return 0;
 }
@@ -2272,8 +2322,13 @@ listremove(PyListObject *self, PyObject *v)
 	Py_ssize_t i;
 
 	for (i = 0; i < self->ob_size; i++) {
+		// 比较列表元素于待删除元素
+		// cmp > 0 表示列表中某个元素的值和待删除的元素匹配
+		// PyObject_RichCompareBool方法定义在[Objects/object.c]
+		// Py_EQ定义在[Include/object.h]
 		int cmp = PyObject_RichCompareBool(self->ob_item[i], v, Py_EQ);
 		if (cmp > 0) {
+			// 删除元素
 			if (list_ass_slice(self, i, i+1,
 					   (PyObject *)NULL) == 0)
 				Py_RETURN_NONE;

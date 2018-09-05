@@ -477,7 +477,7 @@ int_print(PyIntObject *v, FILE *fp, int flags)
      /* flags -- not used but required by interface */
 {
 	fprintf(fp, "%ld\n", v->ob_ival);
-	printf("free_list : %p", free_list);
+//	printf("free_list : %p", free_list);
 	return 0;
 
 //	//JIN_DU
