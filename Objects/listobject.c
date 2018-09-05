@@ -2923,4 +2923,76 @@ PyTypeObject PyListRevIter_Type = {
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	0,					/* tp_repr */
-	0,					/
+	0,					/* tp_as_number */
+	&listreviter_as_sequence,		/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	PyObject_GenericGetAttr,		/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+	0,					/* tp_doc */
+	(traverseproc)listreviter_traverse,	/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	PyObject_SelfIter,			/* tp_iter */
+	(iternextfunc)listreviter_next,		/* tp_iternext */
+	0,
+};
+ static PyObject *
+list_reversed(PyListObject *seq, PyObject *unused)
+{
+	listreviterobject *it;
+ 	it = PyObject_GC_New(listreviterobject, &PyListRevIter_Type);
+	if (it == NULL)
+		return NULL;
+	assert(PyList_Check(seq));
+	it->it_index = PyList_GET_SIZE(seq) - 1;
+	Py_INCREF(seq);
+	it->it_seq = seq;
+	PyObject_GC_Track(it);
+	return (PyObject *)it;
+}
+ static void
+listreviter_dealloc(listreviterobject *it)
+{
+	PyObject_GC_UnTrack(it);
+	Py_XDECREF(it->it_seq);
+	PyObject_GC_Del(it);
+}
+ static int
+listreviter_traverse(listreviterobject *it, visitproc visit, void *arg)
+{
+	Py_VISIT(it->it_seq);
+	return 0;
+}
+ static PyObject *
+listreviter_next(listreviterobject *it)
+{
+	PyObject *item;
+	Py_ssize_t index = it->it_index;
+	PyListObject *seq = it->it_seq;
+ 	if (index>=0 && index < PyList_GET_SIZE(seq)) {
+		item = PyList_GET_ITEM(seq, index);
+		it->it_index--;
+		Py_INCREF(item);
+		return item;
+	}
+	it->it_index = -1;
+	if (seq != NULL) {
+		it->it_seq = NULL;
+		Py_DECREF(seq);
+	}
+	return NULL;
+}
+ static Py_ssize_t
+listreviter_len(listreviterobject *it)
+{
+	Py_ssize_t len = it->it_index + 1;
+	if (it->it_seq == NULL || PyList_GET_SIZE(it->it_seq) < len)
+		return 0;
+	return len;
+}
